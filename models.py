@@ -85,7 +85,7 @@ class UserCredentials(db.Model):
     user = db.relationship('User', back_populates='credentials')
 
 
-class UserGames(db.Model):
+class UserGame(db.Model):
     __tablename__ = 'user_games'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
