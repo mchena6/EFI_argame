@@ -9,6 +9,30 @@ from flask_jwt_extended import (
 )
 from passlib.hash import bcrypt
 
+from models import (
+    db,
+    User,
+    UserCredentials,
+    Developer,
+    Editor,
+    Game,
+    Genre,
+    GameGenre,
+    Review,
+    UserGame
+)
+
+from schemas import(
+    UserSchema,
+    UserCredentialsSchema,
+    DeveloperSchema,
+    EditorSchema,
+    GameSchema,
+    GenreSchema,
+    GameGenreSchema,
+    ReviewSchema
+)
+
 class UserRegisterAPI(MethodView):
     def post():
         ...
@@ -39,7 +63,9 @@ class UserDetailAPI(MethodView):
 class GameAPI(MethodView):
     # Traer juegos 
     def get(self):
-        ...
+        games = Game.query.filter_by(is_published=True).all()
+        return GameSchema(many=True).dump(games), 200
+
     # Agregar juego (admin)
     def post(self):
         ...
