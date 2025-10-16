@@ -8,8 +8,8 @@ class User(db.Model):
     username = db.Column(db.String(100),unique=True,nullable=False)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
-    created_at = db.Column(db.Datetime, server_default=db.func.now())
-    updated_at = db.Column(db.Datetime, onupdate=db.func.now())
+    created_at = db.Column(db.Datetime(), server_default=db.func.now())
+    updated_at = db.Column(db.Datetime(), onupdate=db.func.now())
     
     credentials = db.relationship('UserCredentials',back_populates='user',uselist=False)
     reviews = db.relationship('Review',back_populates='user')
@@ -18,7 +18,7 @@ class User(db.Model):
 
 class Developer(db.Model):
     __tablename__ = 'developers'
-    id = db.Column(db.Integer(),primary_key=True)
+    id = db.Column(db.Integer,primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
 
     games = db.relationship('Game', backref='developer')
@@ -26,7 +26,7 @@ class Developer(db.Model):
 
 class Editor(db.Model):
     __tablename__ = 'editors'
-    id = db.Column(db.Integer(), primary_key=True)
+    id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
 
     games = db.relationship('Game', backref='editor')
@@ -34,18 +34,18 @@ class Editor(db.Model):
 
 class Game(db.Model):
     __tablename__ = 'games'
-    id = db.Column(db.Integer(), primary_key=True)
+    id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Double(), nullable=False)
     release_date = db.Column(db.Date(), nullable=False)
-    thumbnail = db.Column(db.String(255), nullable=False)
-    description = db.Column(db.String(300),nullable=False)
-    is_free = db.Column(db.Boolean, default=False)
+    thumbnail = db.Column(db.String(), nullable=False)
+    description = db.Column(db.String(),nullable=False)
+    is_free = db.Column(db.Boolean(), default=False)
     created_at = db.Column(db.DateTime(), server_default=db.func.now(), nullable=False)
     uploaded_at = db.Column(db.DateTime(), onupdate=db.func.now(), nullable=False)
     developer_id = db.Column(db.ForeignKey('developers.id'))
     editor_id = db.Column(db.ForeignKey('editors.id'))
-    is_published = db.Column(db.Boolean, default=True)
+    is_published = db.Column(db.Boolean(), default=True)
 
     reviews = db.relationship('Review', back_populates='game')
     user_games = db.relationship('UserGame', back_populates='game')
@@ -53,7 +53,7 @@ class Game(db.Model):
 
 class Genre(db.Model):
     __tablename__ = 'genres'
-    id = db.Column(db.Integer(), primary_key=True)
+    id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
 
     games = db.relationship('GameGenre', back_populates='genre')
@@ -67,9 +67,9 @@ class GameGenre(db.Model):
     genre = db.relationship('Genre', back_populates='games')
 
 class Review(db.Model):
-    id = db.Cdolumn(db.Integer(), primary_key=True)
-    user_id = db.Column(db.Integer(), db.ForeignKey('users.id'), nullable=False)
-    game_id = db.Column(db.Integer(), db.ForeignKey('games.id'), nullable=False)
+    id = db.Cdolumn(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    game_id = db.Column(db.Integer, db.ForeignKey('games.id'), nullable=False)
     rating = db.Column(db.Integer, nullable=False)
     text_review = db.Column(db.String(300))
     created_at = db.Column(db.DateTime(), server_default=db.func.now(), nullable=False)
