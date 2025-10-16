@@ -8,8 +8,8 @@ class User(db.Model):
     username = db.Column(db.String(100),unique=True,nullable=False)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
-    created_at = db.Column(db.Datetime(), server_default=db.func.now())
-    updated_at = db.Column(db.Datetime(), onupdate=db.func.now())
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    updated_at = db.Column(db.DateTime, onupdate=db.func.now())
     
     credentials = db.relationship('UserCredentials',back_populates='user',uselist=False)
     reviews = db.relationship('Review',back_populates='user')
@@ -41,8 +41,8 @@ class Game(db.Model):
     thumbnail = db.Column(db.String(), nullable=False)
     description = db.Column(db.String(),nullable=False)
     is_free = db.Column(db.Boolean(), default=False)
-    created_at = db.Column(db.DateTime(), server_default=db.func.now(), nullable=False)
-    uploaded_at = db.Column(db.DateTime(), onupdate=db.func.now(), nullable=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+    uploaded_at = db.Column(db.DateTime, onupdate=db.func.now())
     developer_id = db.Column(db.ForeignKey('developers.id'))
     editor_id = db.Column(db.ForeignKey('editors.id'))
     is_published = db.Column(db.Boolean(), default=True)
@@ -59,7 +59,8 @@ class Genre(db.Model):
     games = db.relationship('GameGenre', back_populates='genre')
 
 class GameGenre(db.Model):
-    __tablename__ = 'game_genres'
+    __tablename__ = 'games_genres'
+    id = db.Column(db.Integer, primary_key=True)
     game_id = db.Column(db.Integer, db.ForeignKey('games.id'), nullable=False)
     genre_id = db.Column(db.Integer, db.ForeignKey('genres.id'), nullable=False)
 
@@ -67,13 +68,17 @@ class GameGenre(db.Model):
     genre = db.relationship('Genre', back_populates='games')
 
 class Review(db.Model):
-    id = db.Cdolumn(db.Integer, primary_key=True)
+    __tablename__ = 'reviews'
+    id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     game_id = db.Column(db.Integer, db.ForeignKey('games.id'), nullable=False)
     rating = db.Column(db.Integer, nullable=False)
     text_review = db.Column(db.String(300))
-    created_at = db.Column(db.DateTime(), server_default=db.func.now(), nullable=False)
-    updated_at = db.Column(db.DateTime(), onupdate=db.func.now())
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+    updated_at = db.Column(db.DateTime, onupdate=db.func.now())
+
+    user = db.relationship('User', back_populates='reviews')
+    game = db.relationship('Game', back_populates='reviews')
 
 class UserCredentials(db.Model):
     __tablename__ = 'user_credentials'
@@ -90,7 +95,7 @@ class UserGame(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     game_id = db.Column(db.Integer, db.ForeignKey('games.id'))
-    claimed_at = db.Column(db.DateTime(), server_default=db.func.now(), nullable=False)
+    claimed_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
 
     user = db.relationship('User', back_populates='user_games')
     game = db.relationship('Game', back_populates='user_games')
