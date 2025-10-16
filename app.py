@@ -24,10 +24,13 @@ app.config['SQLALCHEMY_TRACK_NOTIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = 'SECRET_KEY'
 
 jwt = JWTManager(app)
-db.init(app)
+db.init_app(app)
 
 app.add_url_rule(
     '/games',
     view_func=GameAPI.as_view('games_api'),
     methods=['GET', 'POST']
 )
+
+if __name__ == '__main__':
+    app.run(debug=True)
