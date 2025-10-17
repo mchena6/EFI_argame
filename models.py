@@ -85,9 +85,10 @@ class UserCredentials(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(50), nullable=False)
+    role_id = db.Column(db.Integer, db.ForeignKey('role.id'), nullable=False)
 
     user = db.relationship('User', back_populates='credentials')
+    role = db.relationship('Role', back_populates='credentials')
 
 
 class UserGame(db.Model):
@@ -100,3 +101,7 @@ class UserGame(db.Model):
     user = db.relationship('User', back_populates='user_games')
     game = db.relationship('Game', back_populates='user_games')
 
+class role(db.Model):
+    __tablename__ = 'role'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100),unique=True)
