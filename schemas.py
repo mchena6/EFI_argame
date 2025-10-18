@@ -8,6 +8,7 @@ class UserSchema(Schema):
     email = fields.Email(required=True)
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
+    is_active = fields.Bool(dump_only=True)
     credentials = fields.Nested('UserCredentialsSchema', exclude=('user',), dump_only=True)
     reviews = fields.Nested('ReviewSchema', many=True, exclude=('user',), dump_only=True)
     user_games = fields.Nested('UserGameSchema', many=True, exclude=('user',), dump_only=True)
