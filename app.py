@@ -28,22 +28,41 @@ app.config['JWT_SECRET_KEY'] = 'SECRET_KEY'
 jwt = JWTManager(app)
 db.init_app(app)
 
+# Rutas de los endpoints
+
+# Juegos
 app.add_url_rule(
     '/games',
     view_func=GameAPI.as_view('games_api'),
     methods=['GET', 'POST']
 )
 
+# Registro de usuario
 app.add_url_rule(
     '/register',
     view_func=UserRegisterAPI.as_view('user_register_api'),
     methods=['POST']
 )
 
+# Login de usuario
 app.add_url_rule(
     '/login',
     view_func=AuthLoginAPI.as_view('auth_login_api'),
     methods=['POST']    
+)
+
+# Informacion de usuarios
+app.add_url_rule(
+    '/users',
+    view_func=UserAPI.as_view('users_api'),
+    methods=['GET']
+)
+
+# Informacion detallada de usuario
+app.add_url_rule(
+    '/users/<int:id>',
+    view_func=UserDetailAPI.as_view('user_detail_api'),
+    methods=['GET', 'PATCH', 'DELETE']
 )
 
 
