@@ -36,6 +36,7 @@ from schemas import(
     LoginSchema
 )
 
+# API de registro
 class UserRegisterAPI(MethodView):
     def post(self):
         try:
@@ -65,18 +66,23 @@ class UserRegisterAPI(MethodView):
         db.session.commit()
         return UserSchema().dump(new_user), 201
 
+# API de login
 class AuthLoginAPI(MethodView):
     def post(self):
+        # Traer y validar datos
         try:
             data = LoginSchema().load(request.json)
         except ValidationError as err:
             return{"Error": err.messages}, 400
 
+        # Buscar usuario por email
         user = User.query.filter_by(email=data['email']).first()
         if not user or not user.credentials:
             return {"message": "Credenciales invalidas"}, 401
+        # Verificar contraseña
         if not bcrypt.verify(data['password'], user.credentials.password_hash):
             return {"message": "Credenciales invalidas"}, 401
+        # Crear elementos para el token de acceso
         identity = str(user.id)
         additional_claims = {
             'id' : user.id,
@@ -84,6 +90,7 @@ class AuthLoginAPI(MethodView):
             'username' : user.username,
             'role' : user.credentials.role.name,
         }
+        # Generar el token de acceso
         token = create_access_token(
             identity=identity,
             additional_claims=additional_claims
@@ -91,24 +98,43 @@ class AuthLoginAPI(MethodView):
         return {"access_token": token}, 200
         
 
+# API de usuarios
 class UserAPI(MethodView):
-    # Traer usuarios (admin)
-    def get():
-        ...
+    # Traer usuarios activos (admin)
+    def get(self):
+        users = User.query.filter_by(is_active=True).all()
+        return UserSchema(many=True).dump(users), 200
 
 
+# API de detalle de usuario
 class UserDetailAPI(MethodView):
     # Traer usuario (user, admin)
     def get(self,id):
-        ...
+        user = User.query.get_or_404(id)
+        return UserSchema().dump(user), 200
     # Modificar usuario (admin)
     def patch(self,id):
-        ...
+        user = User.query.get_or_404(id)
+        try:
+            data = UserSchema(partial=True).load(request.json)
+            if 'username' in data:
+                user.username = data['username']
+            if 'email' in data:
+                user.email = data['email']
+            user.updated_at = db.func.now()
+            db.session.commit()
+        except ValidationError as err:
+            return jsonify({"Error": err.messages}), 400
+        return UserSchema().dump(user), 200
     # Desactivar usuario (admin)
     def delete(self,id):
-        ...
+        user = User.query.get_or_404(id)
+        user.is_active = False
+        db.session.commit()
+        return {"message": "Usuario desactivado"}, 200
 
 
+# API de juegos
 class GameAPI(MethodView):
     # Traer juegos 
     def get(self):
