@@ -5,11 +5,12 @@ db = SQLAlchemy()
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100),unique=True,nullable=False)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, onupdate=db.func.now())
+    username = db.Column(db.String(100),unique=True,nullable=False)
+    is_active = db.Column(db.Boolean(), default=True)
     
     credentials = db.relationship('UserCredentials',back_populates='user',uselist=False)
     reviews = db.relationship('Review',back_populates='user')
