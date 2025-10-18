@@ -14,6 +14,8 @@ from views import (
     ReviewDetailAPI,
     GenreAPI,
     GenreDetailAPI,
+    UserRegisterAPI,
+    AuthLoginAPI
 )
 
 app = Flask(__name__)
@@ -31,6 +33,19 @@ app.add_url_rule(
     view_func=GameAPI.as_view('games_api'),
     methods=['GET', 'POST']
 )
+
+app.add_url_rule(
+    '/register',
+    view_func=UserRegisterAPI.as_view('user_register_api'),
+    methods=['POST']
+)
+
+app.add_url_rule(
+    '/login',
+    view_func=AuthLoginAPI.as_view('auth_login_api'),
+    methods=['POST']    
+)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
