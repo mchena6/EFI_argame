@@ -143,18 +143,64 @@ class GameAPI(MethodView):
 
     # Agregar juego (admin)
     def post(self):
-        ...
+        try:
+            data = GameSchema().load(request.json)
+        except ValidationError as err:
+            return jsonify({"Error": err.messages}), 400
+        
+        new_game = Game(
+            name=data['name'],
+            price=data['price'],
+            release_date=data['release_date'],
+            thumbnail=data['thumbnail'],
+            description=data['description'],
+            uploaded_at=db.func.now(),
+            developer_id=data['developer_id'],
+            editor_id=data['editor_id'])
+        db.session.add(new_game)
+        db.session.commit()
+        return GameSchema().dump(new_game), 201
 
 class GameDetailAPI(MethodView):
     # Traer juego
     def get(self,id):
-        ...
+        game = Game.query.get_or_404(id)
+        return GameSchema().dump(game), 200
     # Modificar juego (admin)
-    def put(self,id):
-        ...
+    def patch(self,id):
+        game = Game.query.get_or_404(id)
+        try:
+            data = GameSchema(partial=True).load(request.json)
+            if 'name' in data:
+                game.name = data['name']
+            if 'price' in data:
+                game.price = data['price']
+            if 'release_date' in data:
+                game.release_date = data['release_date']
+            if 'thumbnail' in data:
+                game.thumbnail = data['thumbnail']
+            if 'description' in data:
+                game.description = data['description']
+            if "is_free" in data:
+                game.is_free = data['is_free']
+            if "created_at" in data:
+                game.created_at = data['created_at']
+            if "uploaded_at" in data:
+                game.uploaded_at = data['uploaded_at']
+            if 'developer_id' in data:
+                game.developer_id = data['developer_id']
+            if 'editor_id' in data:
+                game.editor_id = data['editor_id']
+            db.session.commit()
+        except ValidationError as err:
+            return jsonify({"Error": err.messages}), 400
+        return GameSchema().dump(game), 200
     # Desactivar juego (admin)
     def delete(self,id):
-        ...
+        game = Game.query.get_or_404(id)
+        game.is_published = False
+        db.session.commit()
+        return {"message": "Juego desactivado"}, 200
     
 
 class ReviewAPI(MethodView):
