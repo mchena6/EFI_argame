@@ -206,16 +206,35 @@ class GameDetailAPI(MethodView):
 class ReviewAPI(MethodView):
     # Traer review
     def get(self,id):
-        ...
+        reviews = Review.query.filter_by(game_id=id).all()
+        return ReviewSchema(many=True).dump(reviews), 200
     # Agregar review (requiere autorizacion)
     def post(self,id):
-        ...
+        try:
+            data = ReviewSchema().load(request.json)
+        except ValidationError as err:
+            return jsonify({"Error": err.messages}), 400
+        
+        new_review = Review(
+            user_id=data['user_id'],
+            game_id=id,
+            rating=data['rating'],
+            text_review=data['text_review']
+        )
+        db.session.add(new_review)
+        db.session.commit()
+        return ReviewSchema().dump(new_review), 201
 
 class ReviewDetailAPI(MethodView):
     # Desactivar review (moderator, user, admin)
     def delete(self,id):
-        ...
-
+        review = Review.query.get_or_404(id)
+        review.is_visible = False
+        db.session.commit()
+        return {"message": "Review desactivada"}, 200
+    def get(self,id):
+        review = Review.query.get_or_404(id)
+        return ReviewSchema().dump(review), 200
 
 class GenreAPI():
     # Traer generos
