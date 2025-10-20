@@ -19,7 +19,10 @@ from views import (
     AuthLoginAPI
 )
 
+from flask_cors import CORS
+
 app = Flask(__name__)
+CORS(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = (
     'mysql+pymysql://BD2021:BD2021itec@143.198.156.171:3306/argame_db'
 )
