@@ -204,11 +204,11 @@ class GameDetailAPI(MethodView):
     
 
 class ReviewAPI(MethodView):
-    # Traer review
+    # Traer review 
     def get(self,id):
         reviews = Review.query.filter_by(game_id=id).all()
         return ReviewSchema(many=True).dump(reviews), 200
-    # Agregar review (requiere autorizacion)
+    # Agregar review (user)
     def post(self,id):
         try:
             data = ReviewSchema().load(request.json)
@@ -236,16 +236,42 @@ class ReviewDetailAPI(MethodView):
         review = Review.query.get_or_404(id)
         return ReviewSchema().dump(review), 200
 
-class GenreAPI():
-    # Traer generos
-    def get():
-        ...
-    # Agregar genero
-    def post():
-        ...
+class GenreAPI(MethodView):
+    # Traer generos 
+    def get(self):
+        genre = Genre.query.all()
+        return GenreSchema(many=True).dump(genre), 200
+    # Agregar genero (moderator, admin)
+    def post(self):
+        try:
+            data = GenreSchema().load(request.json)
+        except ValidationError as err:
+            return jsonify({"Error": err.messages}), 400
+        
+        new_genre = Genre(
+            name=data['name']
+        )
+        db.session.add(new_genre)
+        db.session.commit()
+        return GenreSchema().dump(new_genre), 201
 
 class GenreDetailAPI(MethodView):
+    # Modificar genero (Moderador, admin)
     def put(self,id):
-        ...
+        try:
+            data = GenreSchema(partial=True).load(request.json)
+        except ValidationError as err:
+            return jsonify({"Error": err.messages}), 400
+        genre = Genre.query.get_or_404(id)
+        if 'name' in data:
+            genre.name = data['name']
+        if 'is_active' in data:
+            genre.is_active = data['is_active']
+        db.session.commit()
+        return GenreSchema().dump(genre), 200
+    # Eliminar genero (admin)
     def delete(self,id):
-        ...
+        genre = Genre.query.get_or_404(id)
+        genre.is_active = False
+        db.session.commit()
+        return {"message": "Genero desactivado"}, 200
