@@ -43,6 +43,7 @@ class GameSchema(Schema):
 class GenreSchema(Schema):
     id = fields.Int(dump_only=True)
     name = fields.Str(required=True)
+    is_active = fields.Bool(load_default=True)
     games = fields.Nested('GameGenreSchema', many=True, exclude=('genre',), dump_only=True)
 
 class GameGenreSchema(Schema):
