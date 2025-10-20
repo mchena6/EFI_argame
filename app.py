@@ -88,5 +88,19 @@ app.add_url_rule(
     methods=['DELETE']
 )
 
+# Informacion de generos
+app.add_url_rule(
+    '/genres',
+    view_func=GenreAPI.as_view('genre_api'),
+    methods=['GET', 'POST']
+)
+
+# Informacion detallada de genero
+app.add_url_rule(
+    '/genres/<int:id>',
+    view_func=GenreDetailAPI.as_view('genre_detail_api'),
+    methods=['PUT', 'DELETE']
+)
+
 if __name__ == '__main__':
     app.run(debug=True)
