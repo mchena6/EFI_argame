@@ -77,6 +77,7 @@ class Review(db.Model):
     text_review = db.Column(db.String(300))
     created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
     updated_at = db.Column(db.DateTime, onupdate=db.func.now())
+    is_visible = db.Column(db.Boolean(), default=True)
 
     user = db.relationship('User', back_populates='reviews')
     game = db.relationship('Game', back_populates='reviews')
