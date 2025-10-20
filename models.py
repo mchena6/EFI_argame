@@ -56,6 +56,7 @@ class Genre(db.Model):
     __tablename__ = 'genres'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
+    is_active = db.Column(db.Boolean(), default=True)
 
     games = db.relationship('GameGenre', back_populates='genre')
 
