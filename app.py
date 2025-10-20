@@ -6,6 +6,7 @@ from models import (
 
 from views import (
     GameAPI,
+    GameDetailAPI,
     UserRegisterAPI,
     AuthLoginAPI,
     UserAPI,
@@ -37,6 +38,14 @@ app.add_url_rule(
     methods=['GET', 'POST']
 )
 
+# Informacion detallada de juego
+app.add_url_rule(
+    '/games/<int:id>',
+    view_func=GameDetailAPI.as_view('game_detail_api'),
+    methods=['GET', 'PATCH', 'DELETE']
+)
+
+
 # Registro de usuario
 app.add_url_rule(
     '/register',
@@ -65,6 +74,19 @@ app.add_url_rule(
     methods=['GET', 'PATCH', 'DELETE']
 )
 
+# Informacion de reviews
+app.add_url_rule(
+    '/games/<int:id>/reviews',
+    view_func=ReviewAPI.as_view('review_api'),
+    methods=['GET', 'POST']
+)
+
+# Informacion detallada de review
+app.add_url_rule(
+    '/reviews/<int:id>',
+    view_func=ReviewDetailAPI.as_view('review_detail_api'),
+    methods=['DELETE']
+)
 
 if __name__ == '__main__':
     app.run(debug=True)
