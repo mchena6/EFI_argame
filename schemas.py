@@ -54,7 +54,6 @@ class GameGenreSchema(Schema):
 class ReviewSchema(Schema):
     id = fields.Int(dump_only=True)
     user_id = fields.Int(required=True)
-    game_id = fields.Int(required=True)
     rating = fields.Int(required=True)
     text_review = fields.Str()
     created_at = fields.DateTime(dump_only=True)
