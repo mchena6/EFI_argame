@@ -36,6 +36,21 @@ from schemas import(
     LoginSchema
 )
 
+from functools import wraps
+
+
+def roles_required(*allowed_roles: str):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            claims = get_jwt()
+            role = claims.get("role")
+            if not role or role not in allowed_roles:
+                return {"Error": "acceso denegado"}, 403
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
 # API de registro
 class UserRegisterAPI(MethodView):
     def post(self):
@@ -78,10 +93,10 @@ class AuthLoginAPI(MethodView):
         # Buscar usuario por email
         user = User.query.filter_by(email=data['email']).first()
         if not user or not user.credentials:
-            return {"message": "Credenciales invalidas"}, 401
+            return {"message": "Email no valido"}, 401
         # Verificar contraseña
         if not bcrypt.verify(data['password'], user.credentials.password_hash):
-            return {"message": "Credenciales invalidas"}, 401
+            return {"message": "Contraseña incorrecta"}, 401
         # Crear elementos para el token de acceso
         identity = str(user.id)
         additional_claims = {
@@ -101,6 +116,8 @@ class AuthLoginAPI(MethodView):
 # API de usuarios
 class UserAPI(MethodView):
     # Traer usuarios activos (admin)
+    @jwt_required()
+    @roles_required('admin')
     def get(self):
         users = User.query.filter_by(is_active=True).all()
         return UserSchema(many=True).dump(users), 200
@@ -108,11 +125,14 @@ class UserAPI(MethodView):
 
 # API de detalle de usuario
 class UserDetailAPI(MethodView):
+    decorators = [jwt_required()]
     # Traer usuario (user, admin)
+    @roles_required('admin','user')
     def get(self,id):
         user = User.query.get_or_404(id)
         return UserSchema().dump(user), 200
     # Modificar usuario (admin)
+    @roles_required('admin')
     def patch(self,id):
         user = User.query.get_or_404(id)
         try:
@@ -127,6 +147,7 @@ class UserDetailAPI(MethodView):
             return jsonify({"Error": err.messages}), 400
         return UserSchema().dump(user), 200
     # Desactivar usuario (admin)
+    @roles_required('admin')
     def delete(self,id):
         user = User.query.get_or_404(id)
         user.is_active = False
@@ -142,6 +163,8 @@ class GameAPI(MethodView):
         return GameSchema(many=True).dump(games), 200
 
     # Agregar juego (admin)
+    @jwt_required()
+    @roles_required('admin')
     def post(self):
         try:
             data = GameSchema().load(request.json)
@@ -167,6 +190,8 @@ class GameDetailAPI(MethodView):
         game = Game.query.get_or_404(id)
         return GameSchema().dump(game), 200
     # Modificar juego (admin)
+    @jwt_required()
+    @roles_required('admin')
     def patch(self,id):
         game = Game.query.get_or_404(id)
         try:
@@ -196,6 +221,8 @@ class GameDetailAPI(MethodView):
             return jsonify({"Error": err.messages}), 400
         return GameSchema().dump(game), 200
     # Desactivar juego (admin)
+    @jwt_required()
+    @roles_required('admin')
     def delete(self,id):
         game = Game.query.get_or_404(id)
         game.is_published = False
@@ -209,14 +236,18 @@ class ReviewAPI(MethodView):
         reviews = Review.query.filter_by(game_id=id).all()
         return ReviewSchema(many=True).dump(reviews), 200
     # Agregar review (user)
+    @jwt_required()
+    @roles_required('user')
     def post(self,id):
         try:
             data = ReviewSchema().load(request.json)
         except ValidationError as err:
             return jsonify({"Error": err.messages}), 400
         
+        current_user_id = get_jwt_identity()
+        
         new_review = Review(
-            user_id=data['user_id'],
+            user_id=current_user_id,
             game_id=id,
             rating=data['rating'],
             text_review=data['text_review']
@@ -227,11 +258,21 @@ class ReviewAPI(MethodView):
 
 class ReviewDetailAPI(MethodView):
     # Desactivar review (moderator, user, admin)
+    @jwt_required()
+    @roles_required('admin','moderator','user')
     def delete(self,id):
         review = Review.query.get_or_404(id)
+        claims = get_jwt()
+        user_role = claims.get('role')
+        current_user_id = get_jwt_identity()
+
+        if user_role == 'user' and str(review.user_id) != current_user_id:
+            return {'error':'No tienes permiso para borrar esta review'}, 403
+
         review.is_visible = False
         db.session.commit()
         return {"message": "Review desactivada"}, 200
+    #Traer reseña
     def get(self,id):
         review = Review.query.get_or_404(id)
         return ReviewSchema().dump(review), 200
@@ -242,6 +283,8 @@ class GenreAPI(MethodView):
         genre = Genre.query.all()
         return GenreSchema(many=True).dump(genre), 200
     # Agregar genero (moderator, admin)
+    @jwt_required()
+    @roles_required('admin','moderator')
     def post(self):
         try:
             data = GenreSchema().load(request.json)
@@ -257,6 +300,8 @@ class GenreAPI(MethodView):
 
 class GenreDetailAPI(MethodView):
     # Modificar genero (Moderador, admin)
+    decorators = [jwt_required()]
+    @roles_required('admin','moderator')
     def put(self,id):
         try:
             data = GenreSchema(partial=True).load(request.json)
@@ -270,6 +315,7 @@ class GenreDetailAPI(MethodView):
         db.session.commit()
         return GenreSchema().dump(genre), 200
     # Eliminar genero (admin)
+    @roles_required('admin')
     def delete(self,id):
         genre = Genre.query.get_or_404(id)
         genre.is_active = False
