@@ -11,6 +11,7 @@ from views import (
     AuthLoginAPI,
     UserAPI,
     UserDetailAPI,
+    UserGameAPI,
     ReviewAPI,
     ReviewDetailAPI,
     GenreAPI,
@@ -76,6 +77,14 @@ app.add_url_rule(
     view_func=UserDetailAPI.as_view('user_detail_api'),
     methods=['GET', 'PATCH', 'DELETE']
 )
+
+# Biblioteca de juegos de usuario
+app.add_url_rule(
+    '/users/<int:id>/games',
+    view_func=UserGameAPI.as_view('user_game_api'),
+    methods=['GET', 'POST']
+)
+
 
 # Informacion de reviews
 app.add_url_rule(

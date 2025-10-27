@@ -25,6 +25,7 @@ from models import (
 from schemas import(
     UserSchema,
     UserCredentialsSchema,
+    UserGameSchema,
     DeveloperSchema,
     EditorSchema,
     GameSchema,
@@ -228,7 +229,36 @@ class GameDetailAPI(MethodView):
         game.is_published = False
         db.session.commit()
         return {"message": "Juego desactivado"}, 200
-    
+
+
+class UserGameAPI(MethodView):    
+    decorators = [jwt_required()]
+    # Traer juegos de usuario (user, admin)
+    @roles_required('admin','user')
+    def get(self,id):
+        user_games = UserGame.query.filter_by(user_id=id).all()
+        return UserGameSchema(many=True).dump(user_games), 200
+    # Agregar juego a usuario (user)
+    @roles_required('user')
+    def post(self,id):
+        try:
+            data = UserGameSchema().load(request.json)
+        except ValidationError as err:
+            return jsonify({"Error": err.messages}), 400
+        
+        current_user_id = get_jwt_identity()
+        if str(id) != current_user_id:
+            return {'error':'No tienes permiso para agregar juegos a este usuario'}, 403
+
+        new_user_game = UserGame(
+            user_id=id,
+            game_id=data['game_id'],
+            claimed_at=db.func.now()
+        )
+        db.session.add(new_user_game)
+        db.session.commit()
+        return UserGameSchema().dump(new_user_game), 201
+
 
 class ReviewAPI(MethodView):
     # Traer review 
@@ -255,6 +285,7 @@ class ReviewAPI(MethodView):
         db.session.add(new_review)
         db.session.commit()
         return ReviewSchema().dump(new_review), 201
+
 
 class ReviewDetailAPI(MethodView):
     # Desactivar review (moderator, user, admin)
@@ -321,3 +352,5 @@ class GenreDetailAPI(MethodView):
         genre.is_active = False
         db.session.commit()
         return {"message": "Genero desactivado"}, 200
+    
+
