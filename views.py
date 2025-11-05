@@ -8,6 +8,7 @@ from flask_jwt_extended import (
     get_jwt
 )
 from passlib.hash import bcrypt
+from datetime import timedelta
 
 from models import (
     db,
@@ -38,6 +39,14 @@ from schemas import(
 )
 
 from functools import wraps
+
+def check_ownership(user_id, resource_owner_id):
+    if str(user_id) != str(resource_owner_id):
+        return False
+    claims = get_jwt()
+    if claims.get("role") == "admin":
+        return True
+    return True
 
 
 def roles_required(*allowed_roles: str):
@@ -106,10 +115,12 @@ class AuthLoginAPI(MethodView):
             'username' : user.username,
             'role' : user.credentials.role.name,
         }
+        expiration = timedelta(hours=24)
         # Generar el token de acceso
         token = create_access_token(
             identity=identity,
-            additional_claims=additional_claims
+            additional_claims=additional_claims,
+            expires_delta=expiration
         )
         return {"access_token": token}, 200
         
@@ -246,8 +257,9 @@ class UserGameAPI(MethodView):
         except ValidationError as err:
             return jsonify({"Error": err.messages}), 400
         
+        # Verificar ownership
         current_user_id = get_jwt_identity()
-        if str(id) != current_user_id:
+        if not check_ownership(current_user_id, id):
             return {'error':'No tienes permiso para agregar juegos a este usuario'}, 403
 
         new_user_game = UserGame(
@@ -297,7 +309,8 @@ class ReviewDetailAPI(MethodView):
         user_role = claims.get('role')
         current_user_id = get_jwt_identity()
 
-        if user_role == 'user' and str(review.user_id) != current_user_id:
+        # Verificar ownership
+        if user_role == 'user' and not check_ownership(current_user_id, review.user_id):
             return {'error':'No tienes permiso para borrar esta review'}, 403
 
         review.is_visible = False
@@ -330,7 +343,7 @@ class GenreAPI(MethodView):
         return GenreSchema().dump(new_genre), 201
 
 class GenreDetailAPI(MethodView):
-    # Modificar genero (Moderador, admin)
+    # Modificar genero (Moderator, admin)
     decorators = [jwt_required()]
     @roles_required('admin','moderator')
     def put(self,id):
@@ -352,5 +365,55 @@ class GenreDetailAPI(MethodView):
         genre.is_active = False
         db.session.commit()
         return {"message": "Genero desactivado"}, 200
+
+class DeveloperAPI(MethodView):
+    # Traer developers
+    def get(self):
+        developers = Developer.query.all()
+        return DeveloperSchema(many=True).dump(developers), 200
     
 
+class DeveloperDetailAPI(MethodView):
+    # Traer developer por id
+    def get(self,id):
+        developer = Developer.query.get_or_404(id)
+        return DeveloperSchema().dump(developer), 200
+
+class EditorAPI(MethodView):
+    # Traer editores
+    def get(self):
+        editors = Editor.query.all()
+        return EditorSchema(many=True).dump(editors), 200
+
+class EditorDetailAPI(MethodView):
+    # Traer editor por id
+    def get(self,id):
+        editor = Editor.query.get_or_404(id)
+        return EditorSchema().dump(editor), 200
+
+
+class GenreGamesAPI(MethodView):
+    # Traer juegos por genero
+    def get(self,id):
+        game_genres = GameGenre.query.filter_by(genre_id=id).all()
+        return GameGenreSchema(many=True).dump(game_genres), 200
+
+
+class StatsAPI(MethodView):
+    # Traer estadisticas (admin, moderator)
+    @jwt_required()
+    @roles_required('admin','moderator')
+    def get(self):
+        total_users = User.query.count()
+        total_games = Game.query.count()
+        total_reviews = Review.query.count()
+        posts_last_week = Game.query.filter(
+            Game.uploaded_at >= db.func.now() - db.text('INTERVAL 7 DAY')
+        ).count()
+        return {
+            "total_users": total_users,
+            "total_games": total_games,
+            "total_reviews": total_reviews,
+            "posts_last_week": posts_last_week
+        }, 200
+            
