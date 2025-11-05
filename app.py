@@ -17,7 +17,13 @@ from views import (
     GenreAPI,
     GenreDetailAPI,
     UserRegisterAPI,
-    AuthLoginAPI
+    AuthLoginAPI,
+    DeveloperAPI,
+    DeveloperDetailAPI,
+    EditorAPI,
+    EditorDetailAPI,
+    GenreGamesAPI,
+    StatsAPI
 )
 
 from flask_cors import CORS
@@ -113,6 +119,50 @@ app.add_url_rule(
     view_func=GenreDetailAPI.as_view('genre_detail_api'),
     methods=['PUT', 'DELETE']
 )
+
+# Informacion de developers
+app.add_url_rule(
+    '/developers',
+    view_func=DeveloperAPI.as_view('developer_api'),
+    methods=['GET']
+)
+
+# Informacion detallada de developer
+app.add_url_rule(
+    '/developers/<int:id>',
+    view_func=DeveloperDetailAPI.as_view('developer_detail_api'),
+    methods=['GET']
+)
+
+# Informacion de editores
+app.add_url_rule(
+    '/editors',
+    view_func=EditorAPI.as_view('editor_api'),
+    methods=['GET']
+)
+
+# Informacion detallada de editor
+app.add_url_rule(
+    '/editors/<int:id>',
+    view_func=EditorDetailAPI.as_view('editor_detail_api'),
+    methods=['GET']
+)
+
+# Informacion de juegos por genero
+app.add_url_rule(
+    '/genres/<int:id>/games',
+    view_func=GenreGamesAPI.as_view('genre_games_api'),
+    methods=['GET']
+)
+
+
+# Estadisticas
+app.add_url_rule(
+    '/stats',
+    view_func=StatsAPI.as_view('stats_api'),
+    methods=['GET']
+)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
