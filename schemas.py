@@ -69,6 +69,7 @@ class ReviewSchema(Schema):
     text_review = fields.Str()
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
+    is_visible = fields.Bool(load_default=True)
     user = fields.Nested('UserSchema', exclude=('reviews', 'credentials', 'user_games'), dump_only=True)
     game = fields.Nested('GameSchema', exclude=('reviews', 'user_games', 'genres'), dump_only=True)
 
