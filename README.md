@@ -55,6 +55,18 @@ POST /register
 
 Descripción: Registra un nuevo usuario en el sistema.
 Acceso: Público.
+
+Crear admin:
+Body (JSON):
+{
+  "username": "nuevo_admin",
+  "name": "Nombre Apellido",
+  "email": "admin@ejemplo.com",
+  "password": "clave",
+  "role_id": 1 
+}
+
+Crear usuario:
 Body (JSON):
 {
   "username": "nuevo_usuario",
@@ -62,6 +74,16 @@ Body (JSON):
   "email": "usuario@ejemplo.com",
   "password": "clave",
   "role_id": 2 
+}
+
+Crear moderator:
+Body (JSON):
+{
+  "username": "nuevo_moderador",
+  "name": "Nombre Apellido",
+  "email": "moderador@ejemplo.com",
+  "password": "clave",
+  "role_id": 3 
 }
 
 
@@ -264,3 +286,24 @@ GET /stats
 
 Descripción: Obtiene estadísticas generales del sitio (total de usuarios, juegos, reseñas y publicaciones de la última semana).
 Acceso: Admin o Moderator. (Requiere token JWT).
+
+
+5. Credenciales de prueba
+
+Admin:
+{
+  "email": "admin@gmail.com",
+  "password": "admin"
+}
+
+User:
+{
+  "email": "zous@gmail.com",
+  "password": "zous"
+}
+
+Moderator:
+{
+  "email": "moderator@gmail.com",
+  "password": "moderator"
+}
