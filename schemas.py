@@ -13,6 +13,14 @@ class UserSchema(Schema):
     reviews = fields.Nested('ReviewSchema', many=True, exclude=('user',), dump_only=True)
     user_games = fields.Nested('UserGameSchema', many=True, exclude=('user',), dump_only=True)
 
+class UserCredentialsSchema(Schema):
+    id = fields.Int(dump_only=True)
+    user_id = fields.Int(required=True)
+    password_hash = fields.Str(required=True, load_only=True)
+    role_id = fields.Int(required=True)
+    user = fields.Nested('UserSchema', exclude=('credentials',), dump_only=True)
+    role = fields.Nested('RoleSchema', exclude=('credentials',), dump_only=True)
+
 class DeveloperSchema(Schema):
     id = fields.Int(dump_only=True)
     name = fields.Str(required=True)
