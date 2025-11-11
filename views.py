@@ -32,7 +32,6 @@ from schemas import(
     GenreSchema,
     GameGenreSchema,
     ReviewSchema,
-    RoleSchema,
     RegisterSchema,
     LoginSchema
 )
