@@ -64,14 +64,6 @@ class ReviewSchema(Schema):
     user = fields.Nested('UserSchema', exclude=('reviews', 'credentials', 'user_games'), dump_only=True)
     game = fields.Nested('GameSchema', exclude=('reviews', 'user_games', 'genres'), dump_only=True)
 
-class UserCredentialsSchema(Schema):
-    id = fields.Int(dump_only=True)
-    user_id = fields.Int(required=True)
-    password_hash = fields.Str(required=True, load_only=True)
-    role_id = fields.Int(required=True)
-    user = fields.Nested('UserSchema', exclude=('credentials', 'reviews', 'user_games'), dump_only=True)
-    role = fields.Nested('RoleSchema', exclude=('credentials',), dump_only=True)
-
 class UserGameSchema(Schema):
     id = fields.Int(dump_only=True)
     user_id = fields.Int(required=True)
