@@ -1,9 +1,11 @@
 from flask import Flask
+# Libreria para manejar JWT
 from flask_jwt_extended import JWTManager
 from models import (
     db
 )
 
+# Vistas
 from views import (
     GameAPI,
     GameDetailAPI,
@@ -26,15 +28,32 @@ from views import (
     StatsAPI
 )
 
+# Libreria para cargar variables de entorno
+import os 
+from dotenv import load_dotenv
+
+# Variables de entorno
+load_dotenv()
+
+# Cargar variables de entorno para la BD
+DB_USER = os.getenv('DB_USER')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
+DB_HOST = os.getenv('DB_HOST')
+DB_PORT = os.getenv('DB_PORT')
+DB_NAME = os.getenv('DB_NAME')
+
+# Libreria para manejar CORS
 from flask_cors import CORS
 
+# Configuracion de la aplicacion
 app = Flask(__name__)
 CORS(app)
+# Conexion a base de datos MySQL
 app.config['SQLALCHEMY_DATABASE_URI'] = (
-    'mysql+pymysql://BD2021:BD2021itec@143.198.156.171:3306/argame_db'
+    f'mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
 )
 app.config['SQLALCHEMY_TRACK_NOTIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = 'SECRET_KEY'
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
 
 jwt = JWTManager(app)
 db.init_app(app)
