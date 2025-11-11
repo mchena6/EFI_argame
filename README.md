@@ -22,13 +22,21 @@ En Windows:
 python -m venv venv
 .\venv\Scripts\activate
 
-c. Instalar Dependencias
+c. Crear una copia del archivo de ejemplo .env.example y llamarla .env
+
+En Linux/macOS: 
+cp .env.example .env
+
+En Windows:
+copy .env.example .env
+
+d. Abrir el nuevo archivo .env, generar su propia clave secreta para JWT_SECRET_KEY y colocar las credenciales para la conexion a la base de datos
+
+e. Instalar Dependencias
 Usa el archivo requirements.txt provisto para instalar todas las librerías necesarias.
 
 pip install -r requirements.txt
 
-d. Configuración de la Base de Datos
-La conexión a la base de datos MySQL ya está configurada en app.py para conectarse a un servidor remoto
 
 2. Cómo Ejecutar el Proyecto ▶️
 Una vez que las dependencias estén instaladas y el entorno virtual esté activado, puedes iniciar el servidor de Flask.
