@@ -20,7 +20,8 @@ from models import (
     Genre,
     GameGenre,
     Review,
-    UserGame
+    UserGame,
+    Role
 )
 
 from schemas import(
@@ -33,7 +34,8 @@ from schemas import(
     GameGenreSchema,
     ReviewSchema,
     RegisterSchema,
-    LoginSchema
+    LoginSchema,
+    RoleSchema
 )
 
 from functools import wraps
@@ -533,3 +535,11 @@ class StatsAPI(MethodView):
             "posts_last_week": posts_last_week
         }, 200
             
+
+# ----- Roles -----
+
+# API de roles
+class RoleAPI(MethodView):
+    def get(self):
+        roles = Role.query.all()
+        return RoleSchema(many=True).dump(roles), 200
