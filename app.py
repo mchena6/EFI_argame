@@ -25,7 +25,8 @@ from views import (
     EditorAPI,
     EditorDetailAPI,
     GenreGamesAPI,
-    StatsAPI
+    StatsAPI,
+    RoleAPI
 )
 
 # Libreria para cargar variables de entorno
@@ -182,6 +183,12 @@ app.add_url_rule(
     methods=['GET']
 )
 
+# Roles de usuario
+app.add_url_rule(
+    '/roles',
+    view_func=RoleAPI.as_view('roles_api'),
+    methods=['GET']
+)
 
 if __name__ == '__main__':
     app.run(debug=True)
