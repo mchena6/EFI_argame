@@ -40,6 +40,7 @@ from schemas import(
 
 from functools import wraps
 
+
 # Función para verificar si un usuario es propietario de un recurso o es admin
 def check_ownership(user_id, resource_owner_id):
     # Verificar si el usuario es el propietario
@@ -203,12 +204,13 @@ class UserDetailAPI(MethodView):
 
 # API de juegos
 class GameAPI(MethodView):
+
     # Traer juegos 
     def get(self):
         games = Game.query.filter_by(is_published=True).all()
         return GameSchema(many=True).dump(games), 200
 
-    # Agregar juego (admin)
+# Agregar juego (admin)
     @jwt_required()
     @roles_required('admin')
     def post(self):
@@ -228,11 +230,25 @@ class GameAPI(MethodView):
             uploaded_at=db.func.now(),
             developer_id=data['developer_id'],
             editor_id=data['editor_id'])
-        # Guardar en la base de datos
+                
+        # Agregar a la base de datos
         db.session.add(new_game)
+    
+        # Agregar generos usando una lista de genre_ids
+        if 'genre_ids' in data:
+            for genre_id in data['genre_ids']:
+                # Buscar el genero por id
+                genre = Genre.query.get(genre_id)
+                if genre and genre.is_active:
+                    #  Crear el objeto para tabla intermedia de generos por juego
+                    new_association = GameGenre(genre=genre)
+                    
+                    # Asociar el genero al juego y agregarlo en la tabla intermedia game_genres
+                    new_game.genres.append(new_association)
+
+        # Guardar en la base de datos
         db.session.commit()
         return GameSchema().dump(new_game), 201
-
 
 # API de detalle de juego
 class GameDetailAPI(MethodView):
@@ -241,16 +257,22 @@ class GameDetailAPI(MethodView):
         game = Game.query.get_or_404(id)
         return GameSchema().dump(game), 200
     
-    # Modificar juego (admin)
+# Modificar juego (admin)
     @jwt_required()
     @roles_required('admin')
     def patch(self,id):
+        
+        # Verificar que request.json existe
+        if not request.json:
+            return jsonify({"error": "No JSON data provided"}), 400
+
         # Traer juego por id
         game = Game.query.get_or_404(id)
         try:
             # Validar datos
             data = GameSchema(partial=True).load(request.json)
-            # Actualizar campos
+
+            # Actualizar campos simples
             if 'name' in data:
                 game.name = data['name']
             if 'price' in data:
@@ -263,19 +285,42 @@ class GameDetailAPI(MethodView):
                 game.description = data['description']
             if "is_free" in data:
                 game.is_free = data['is_free']
-            if "created_at" in data:
-                game.created_at = data['created_at']
-            if "uploaded_at" in data:
-                game.uploaded_at = data['uploaded_at']
             if 'developer_id' in data:
                 game.developer_id = data['developer_id']
             if 'editor_id' in data:
                 game.editor_id = data['editor_id']
+            if 'is_published' in data:
+                game.is_published = data['is_published']
+
+            # Actualizar generos del juego 
+            if 'genre_ids' in data:
+
+                # Borrar todas las asociaciones de género existentes para este juego
+                db.session.execute(
+                    db.delete(GameGenre).where(GameGenre.game_id == id)
+                )
+
+                # Crear las asociaciones de genero nuevas 
+                for genre_id in data['genre_ids']:
+                    genre = Genre.query.get(genre_id)
+                    # Verificar que el genero exista y este activo 
+                    if genre and genre.is_active:
+                        # Crear el objeto para tabla intermedia de generos por juego
+                        new_association = GameGenre(genre=genre)
+                        # Asociar el genero al juego y agregarlo en la tabla intermedia game_genres
+                        game.genres.append(new_association)
+            
+            # Actualizar la fecha de modificación
+            game.uploaded_at = db.func.now()
+            # Guardar cambios en base de datos
             db.session.commit()
+            
         except ValidationError as err:
+            db.session.rollback()
             return jsonify({"Error": err.messages}), 400
+        
         return GameSchema().dump(game), 200
-    
+        
     # Desactivar juego (admin)
     @jwt_required()
     @roles_required('admin')
@@ -399,7 +444,7 @@ class ReviewDetailAPI(MethodView):
 class GenreAPI(MethodView):
     # Traer generos 
     def get(self):
-        genre = Genre.query.all()
+        genre = Genre.query.filter_by(is_active=True).all()
         return GenreSchema(many=True).dump(genre), 200
     
     # Agregar genero (moderator, admin)
