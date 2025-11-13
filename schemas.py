@@ -47,6 +47,7 @@ class GameSchema(Schema):
     reviews = fields.Nested('ReviewSchema', many=True, exclude=('game',), dump_only=True)
     user_games = fields.Nested('UserGameSchema', many=True, exclude=('game',), dump_only=True)
     genres = fields.Nested('GameGenreSchema', many=True, exclude=('game',), dump_only=True)
+    genre_ids = fields.List(fields.Int(), load_only=True, data_key='genres')
     developer = fields.Nested('DeveloperSchema', exclude=('games',), dump_only=True)
     editor = fields.Nested('EditorSchema', exclude=('games',), dump_only=True)
 
