@@ -3,24 +3,19 @@ from marshmallow import ValidationError
 from flask.views import MethodView
 from flask_jwt_extended import (
     jwt_required,
-    create_access_token,
     get_jwt_identity,
     get_jwt
 )
-from passlib.hash import bcrypt
-from datetime import timedelta
 
 from models import (
     db,
     User,
-    UserCredentials,
     Developer,
     Editor,
     Game,
     Genre,
     GameGenre,
     Review,
-    UserGame,
     Role
 )
 
@@ -37,6 +32,10 @@ from schemas import(
     LoginSchema,
     RoleSchema
 )
+
+from services.auth_service import AuthService
+from services.game_service import GameService
+from services.user_game_service import UserGameService
 
 from functools import wraps
 
@@ -68,84 +67,58 @@ def roles_required(*allowed_roles: str):
 
 # ----- Autenticacion -----
 
-
-# API de registro
+# API de registro (¡Refactorizada!)
 class UserRegisterAPI(MethodView):
+    
+    def __init__(self):
+        # Servicio de autenticacion
+        self.service = AuthService()
+
     def post(self):
         try:
-            # Traer y validar datos
+            # Validar datos de entrada
             data = RegisterSchema().load(request.json)
         except ValidationError as err:
             return jsonify({"Error": err.messages}), 400
         
-        # Verificar si el email ya existe
-        if User.query.filter_by(email=data['email']).first():
-            return {"message": "Email en uso"}, 400
+        try:
+            # Llamar al servicio para validar datos
+            new_user = self.service.register_user(data)
+            return UserSchema().dump(new_user), 201
         
-        # Crear usuario
-        new_user = User(
-            username=data['username'],
-            name=data['name'],
-            email=data['email']
-        )
-        # Guardar en la base de datos
-        db.session.add(new_user)
-        db.session.flush()
-
-        # Hashear la contraseña
-        password_hash = bcrypt.hash(data['password'])
-
-        # Crear credenciales
-        credentials = UserCredentials(
-            user_id=new_user.id,
-            password_hash=password_hash,
-            role_id=data['role_id']
-        )
-        # Guardar credenciales en la base de datos
-        db.session.add(credentials)
-        db.session.commit()
-        return UserSchema().dump(new_user), 201
+        # Manejar errores
+        except ValueError as e:
+            # Deshacer cambios si hubo error
+            db.session.rollback() 
+            return {"message": str(e)}, 400
+        except Exception as e:
+            db.session.rollback()
+            return {"message": "Error interno del servidor"}, 500
 
 
 # API de login
 class AuthLoginAPI(MethodView):
+
+    def __init__(self):
+        self.service = AuthService()
+
     def post(self):
-        # Traer y validar datos
         try:
+            # Validar datos 
             data = LoginSchema().load(request.json)
         except ValidationError as err:
             return{"Error": err.messages}, 400
 
-        # Buscar usuario por email
-        user = User.query.filter_by(email=data['email']).first()
-
-        # Verificar si el usuario existe
-        if not user or not user.credentials:
-            return {"message": "Email no valido"}, 401
+        try:
+            # Llamar al servicio para loguearse
+            token = self.service.login_user(data['email'], data['password'])
+            
+            # Mostrar token de acceso
+            return {"access_token": token}, 200
         
-        # Verificar contraseña
-        if not bcrypt.verify(data['password'], user.credentials.password_hash):
-            return {"message": "Contraseña incorrecta"}, 401
-        
-        # Crear elementos para el token de acceso
-        identity = str(user.id)
-        additional_claims = {
-            'id' : user.id,
-            'email' : user.email,
-            'username' : user.username,
-            'role' : user.credentials.role.name,
-        }
-        expiration = timedelta(hours=24)
-        
-        # Generar el token de acceso
-        token = create_access_token(
-            identity=identity,
-            additional_claims=additional_claims,
-            expires_delta=expiration
-        )
-        return {"access_token": token}, 200
-        
-
+        # Manejar errores
+        except ValueError as e:
+            return {"message": str(e)}, 401
 
 # ----- Usuarios -----
 
@@ -201,148 +174,109 @@ class UserDetailAPI(MethodView):
 
 # ------ Juegos -----
 
-
-# API de juegos
+# API de juegos 
 class GameAPI(MethodView):
+
+    def __init__(self):
+        self.service = GameService()
 
     # Traer juegos 
     def get(self):
-        games = Game.query.filter_by(is_published=True).all()
+        # Llamar al servicio para traer los juegos publicados
+        games = self.service.get_published_games()
         return GameSchema(many=True).dump(games), 200
 
-# Agregar juego (admin)
+    # Agregar juego (admin)
     @jwt_required()
     @roles_required('admin')
     def post(self):
         try:
-            # Traer y validar datos
+            # Validar datos
             data = GameSchema().load(request.json)
         except ValidationError as err:
             return jsonify({"Error": err.messages}), 400
         
-        # Crear juego nuevo
-        new_game = Game(
-            name=data['name'],
-            price=data['price'],
-            release_date=data['release_date'],
-            thumbnail=data['thumbnail'],
-            description=data['description'],
-            uploaded_at=db.func.now(),
-            developer_id=data['developer_id'],
-            editor_id=data['editor_id'])
-                
-        # Agregar a la base de datos
-        db.session.add(new_game)
-    
-        # Agregar generos usando una lista de genre_ids
-        if 'genre_ids' in data:
-            for genre_id in data['genre_ids']:
-                # Buscar el genero por id
-                genre = Genre.query.get(genre_id)
-                if genre and genre.is_active:
-                    #  Crear el objeto para tabla intermedia de generos por juego
-                    new_association = GameGenre(genre=genre)
-                    
-                    # Asociar el genero al juego y agregarlo en la tabla intermedia game_genres
-                    new_game.genres.append(new_association)
-
-        # Guardar en la base de datos
-        db.session.commit()
-        return GameSchema().dump(new_game), 201
+        try:
+            # Llamar al servicio para postear un juego
+            new_game = self.service.create_game(data)
+            return GameSchema().dump(new_game), 201
+        
+        # Manejar errores
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"Error": f"Error interno: {str(e)}"}), 500
 
 # API de detalle de juego
 class GameDetailAPI(MethodView):
+    
+    def __init__(self):
+        self.service = GameService()
+
     # Traer juego
     def get(self,id):
-        game = Game.query.get_or_404(id)
-        return GameSchema().dump(game), 200
+        try:
+            # Llamar al servicio para traer juegos por id
+            game = self.service.get_game_by_id(id)
+            return GameSchema().dump(game), 200
+        # Manejar error
+        except ValueError as e:
+            return jsonify({"Error": str(e)}), 404
     
-# Modificar juego (admin)
+    # Modificar juego (admin)
     @jwt_required()
     @roles_required('admin')
     def patch(self,id):
         
-        # Verificar que request.json existe
         if not request.json:
             return jsonify({"error": "No JSON data provided"}), 400
 
-        # Traer juego por id
-        game = Game.query.get_or_404(id)
         try:
             # Validar datos
             data = GameSchema(partial=True).load(request.json)
-
-            # Actualizar campos simples
-            if 'name' in data:
-                game.name = data['name']
-            if 'price' in data:
-                game.price = data['price']
-            if 'release_date' in data:
-                game.release_date = data['release_date']
-            if 'thumbnail' in data:
-                game.thumbnail = data['thumbnail']
-            if 'description' in data:
-                game.description = data['description']
-            if "is_free" in data:
-                game.is_free = data['is_free']
-            if 'developer_id' in data:
-                game.developer_id = data['developer_id']
-            if 'editor_id' in data:
-                game.editor_id = data['editor_id']
-            if 'is_published' in data:
-                game.is_published = data['is_published']
-
-            # Actualizar generos del juego 
-            if 'genre_ids' in data:
-
-                # Borrar todas las asociaciones de género existentes para este juego
-                db.session.execute(
-                    db.delete(GameGenre).where(GameGenre.game_id == id)
-                )
-
-                # Crear las asociaciones de genero nuevas 
-                for genre_id in data['genre_ids']:
-                    genre = Genre.query.get(genre_id)
-                    # Verificar que el genero exista y este activo 
-                    if genre and genre.is_active:
-                        # Crear el objeto para tabla intermedia de generos por juego
-                        new_association = GameGenre(genre=genre)
-                        # Asociar el genero al juego y agregarlo en la tabla intermedia game_genres
-                        game.genres.append(new_association)
-            
-            # Actualizar la fecha de modificación
-            game.uploaded_at = db.func.now()
-            # Guardar cambios en base de datos
-            db.session.commit()
-            
         except ValidationError as err:
-            db.session.rollback()
             return jsonify({"Error": err.messages}), 400
+            
+        try:
+            # Llamar al servicio para modificar datos de un juego
+            updated_game = self.service.update_game(id, data)
+            return GameSchema().dump(updated_game), 200
         
-        return GameSchema().dump(game), 200
+        # Manejar errores
+        except ValueError as e:
+            db.session.rollback()
+            return jsonify({"Error": str(e)}), 404
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"Error": f"Error interno: {str(e)}"}), 500
         
     # Desactivar juego (admin)
     @jwt_required()
     @roles_required('admin')
     def delete(self,id):
-        # Traer juego por id y desactivar
-        game = Game.query.get_or_404(id)
-        game.is_published = False
-        db.session.commit()
-        return {"message": "Juego desactivado"}, 200
-
+        try:
+            # Llamar al servicio para desactivar un juego
+            message = self.service.disable_game(id)
+            return jsonify(message), 200
+        
+        # Manejar error
+        except ValueError as e:
+            db.session.rollback()
+            return jsonify({"Error": str(e)}), 404
 
 # ----- Biblioteca de juegos -----
-
 
 # API de biblioteca de juegos de usuario
 class UserGameAPI(MethodView):    
     decorators = [jwt_required()]
+    
+    def __init__(self):
+        self.service = UserGameService()
+
     # Traer juegos de usuario (user, admin)
     @roles_required('admin','user')
     def get(self,id):
-        # Traer juegos por id de usuario
-        user_games = UserGame.query.filter_by(user_id=id).all()
+        # Llamar al servicio para traer juegos por id de usuario
+        user_games = self.service.get_games_for_user(user_id=id)
         return UserGameSchema(many=True).dump(user_games), 200
     
     # Agregar juego a usuario (user)
@@ -354,22 +288,33 @@ class UserGameAPI(MethodView):
         except ValidationError as err:
             return jsonify({"Error": err.messages}), 400
         
-        # Verificar ownership
+        # Obtener id del usuario logueado
         current_user_id = get_jwt_identity()
+        # Verificar ownership
         if not check_ownership(current_user_id, id):
             return {'error':'No tienes permiso para agregar juegos a este usuario'}, 403
-
-        # Agregar juego a la biblioteca
-        new_user_game = UserGame(
-            user_id=id,
-            game_id=data['game_id'],
-            claimed_at=db.func.now()
-        )
-        # Guardar en la base de datos
-        db.session.add(new_user_game)
-        db.session.commit()
-        return UserGameSchema().dump(new_user_game), 201
-
+        
+        # Obtener datos de la solicitud
+        game_id = data['game_id']
+        user_id = id
+                
+        try:
+            # Llamar al servicio para agregar un juego a la biblioteca de un usuario
+            new_user_game = self.service.add_game_to_user(
+                user_id=user_id, 
+                game_id=game_id, 
+                current_user_id=current_user_id
+            )
+            return UserGameSchema().dump(new_user_game), 201
+            
+        # Manejar errores de duplicados
+        except ValueError as e:
+            db.session.rollback()
+            return {'error': str(e)}, 400
+        #  Manejar errores inesperados
+        except Exception as e:
+            db.session.rollback()
+            return {'error': f'Error interno del servidor: {str(e)}'}, 500
 
 # ----- Reviews -----
 
