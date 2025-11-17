@@ -36,6 +36,8 @@ from schemas import(
 from services.auth_service import AuthService
 from services.game_service import GameService
 from services.user_game_service import UserGameService
+from services.review_service import ReviewService
+from services.genre_service import GenreService
 
 from functools import wraps
 
@@ -321,10 +323,14 @@ class UserGameAPI(MethodView):
 
 # API de reviews
 class ReviewAPI(MethodView):
+
+    def __init__(self):
+        self.service = ReviewService()
+
     # Traer review 
     def get(self,id):
-        # Traer reviews por id de juego
-        reviews = Review.query.filter_by(game_id=id).all()
+        # Llamar al servicio para traer las reviews de un juego por su id
+        reviews = self.service.get_reviews_for_game(game_id=id)
         return ReviewSchema(many=True).dump(reviews), 200
     
     # Agregar review (user)
@@ -337,31 +343,43 @@ class ReviewAPI(MethodView):
         except ValidationError as err:
             return jsonify({"Error": err.messages}), 400
         
-        # Obtener usuario logueado
+        # Obtener datos del usuario logueado y el juego
         current_user_id = get_jwt_identity()
-        
-        # Crear nueva review
-        new_review = Review(
-            user_id=current_user_id,
-            game_id=id,
-            rating=data['rating'],
-            text_review=data['text_review']
-        )
-        # Guardar en la base de datos
-        db.session.add(new_review)
-        db.session.commit()
-        return ReviewSchema().dump(new_review), 201
+        game_id = id 
+
+        try:
+            # Llamar servicio para agregar review
+            new_review = self.service.add_review(
+                game_id=game_id,
+                user_id=current_user_id,
+                data=data
+            )
+            return ReviewSchema().dump(new_review), 201
+        # Manejar error de duplicado
+        except ValueError as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 400
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
 
-# API de detalle de review
+# API de detalle de review (¡Refactorizada!)
 class ReviewDetailAPI(MethodView):
+
+    def __init__(self):
+        self.service = ReviewService()
+
     # Desactivar review (moderator, user, admin)
     @jwt_required()
     @roles_required('admin','moderator','user')
     def delete(self,id):
-        # Traer review por id
-        review = Review.query.get_or_404(id)
-        # Obtener rol y usuario actual
+        try:
+            # Llamar servicio para obtener review por id
+            review = self.service.get_review_by_id(review_id=id)
+        except ValueError as e:
+            return jsonify({"Error": str(e)}), 404
+        
         claims = get_jwt()
         user_role = claims.get('role')
         current_user_id = get_jwt_identity()
@@ -370,52 +388,71 @@ class ReviewDetailAPI(MethodView):
         if user_role == 'user' and not check_ownership(current_user_id, review.user_id):
             return {'error':'No tienes permiso para borrar esta review'}, 403
 
-        # Desactivar review
-        review.is_visible = False
-        db.session.commit()
-        return {"message": "Review desactivada"}, 200
+        try:
+            # Llamar al servicio para desactivar review
+            message = self.service.disable_review(review_id=id)
+            return jsonify(message), 200
+        # Manejar errores
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": f"Error interno: {str(e)}"}), 500
     
     #Traer reseña
     def get(self,id):
-        # Traer review por id
-        review = Review.query.get_or_404(id)
-        return ReviewSchema().dump(review), 200
-
+        try:
+            # Llamar servicio para obtener review por id
+            review = self.service.get_review_by_id(review_id=id)
+            return ReviewSchema().dump(review), 200
+        # Manejar error
+        except ValueError as e:
+            return jsonify({"Error": str(e)}), 404
 
 # ----- Generos -----
 
-
-# Api de generos
+# Api de generos 
 class GenreAPI(MethodView):
+
+    def __init__(self):
+        self.service = GenreService()
+
     # Traer generos 
     def get(self):
-        genre = Genre.query.filter_by(is_active=True).all()
-        return GenreSchema(many=True).dump(genre), 200
+        # Llamar servicio para traer generos
+        genres = self.service.get_active_genres()
+        return GenreSchema(many=True).dump(genres), 200
     
     # Agregar genero (moderator, admin)
     @jwt_required()
     @roles_required('admin','moderator')
     def post(self):
         try:
-            # Validar datos
+            # Validar los datos
             data = GenreSchema().load(request.json)
         except ValidationError as err:
             return jsonify({"Error": err.messages}), 400
         
-        # Crear nuevo genero
-        new_genre = Genre(
-            name=data['name']
-        )
-        # Guardar en la base de datos
-        db.session.add(new_genre)
-        db.session.commit()
-        return GenreSchema().dump(new_genre), 201
+        try:
+            # Llamar servicio para agregar genero nuevo
+            new_genre = self.service.create_genre(data)
+            return GenreSchema().dump(new_genre), 201
+        # Manejar error de duplicado
+        except ValueError as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 400
+        # Manejar otros errores
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
 
-# API de detalle de genero
+# API de detalle de genero 
 class GenreDetailAPI(MethodView):
-    # Modificar genero (Moderator, admin)
     decorators = [jwt_required()]
+    
+    def __init__(self):
+        self.service = GenreService()
+
+    # Modificar genero (Moderator, admin)
     @roles_required('admin','moderator')
     def put(self,id):
         try:
@@ -424,35 +461,29 @@ class GenreDetailAPI(MethodView):
         except ValidationError as err:
             return jsonify({"Error": err.messages}), 400
         
-        # Traer genero por id
-        genre = Genre.query.get_or_404(id)
-        # Actualizar campos
-        if 'name' in data:
-            genre.name = data['name']
-        if 'is_active' in data:
-            genre.is_active = data['is_active']
-        db.session.commit()
-        return GenreSchema().dump(genre), 200
+        try:
+            # Llamar servicio para actualizar genero
+            updated_genre = self.service.update_genre(id, data)
+            return GenreSchema().dump(updated_genre), 200
+        # Manejar errores 
+        except ValueError as e:
+            db.session.rollback()
+            return jsonify({"Error": str(e)}), 400 
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"error": f"Error interno: {str(e)}"}), 500
     
     # Eliminar genero (admin)
     @roles_required('admin')
     def delete(self,id):
-        # Traer genero por id y desactivar
-        genre = Genre.query.get_or_404(id)
-        genre.is_active = False
-        db.session.commit()
-        return {"message": "Genero desactivado"}, 200
-
-
-# API de juegos por genero
-class GenreGamesAPI(MethodView):
-    @jwt_required()
-    @roles_required('admin','moderator','user')
-    # Traer juegos por genero
-    def get(self,id):
-        # Traer juegos por id de genero
-        game_genres = GameGenre.query.filter_by(genre_id=id).all()
-        return GameGenreSchema(many=True).dump(game_genres), 200
+        try:
+            # Llamar servicio para desactivar genero
+            message = self.service.disable_genre(id)
+            return jsonify(message), 200
+        # Manejar error "No encontrado"
+        except ValueError as e:
+            db.session.rollback()
+            return jsonify({"Error": str(e)}), 404
 
 
 # ----- Developers y Editors -----
