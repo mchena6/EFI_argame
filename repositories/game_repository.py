@@ -19,3 +19,13 @@ class GameRepository:
         db.session.execute(
             db.delete(GameGenre).where(GameGenre.game_id == game_id)
         )
+
+    # Obtener cantidad de juegos
+    def count_all(self):
+        return Game.query.count()
+
+    # Obtener cantidad de juegos posteados en la ultima semana
+    def count_recent(self, days=7):
+        return Game.query.filter(
+            Game.uploaded_at >= db.func.now() - db.text(f'INTERVAL {days} DAY')
+        ).count()
