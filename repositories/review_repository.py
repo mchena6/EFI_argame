@@ -17,3 +17,7 @@ class ReviewRepository:
     # Agrega una nueva review a la base de datos
     def add(self, review):
         db.session.add(review)
+
+    # Obtener cantidad de reviews
+    def count_all(self):
+        return Review.query.count()
