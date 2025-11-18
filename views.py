@@ -1,24 +1,19 @@
 from flask import request, jsonify
 from marshmallow import ValidationError
 from flask.views import MethodView
+# JWT 
 from flask_jwt_extended import (
     jwt_required,
     get_jwt_identity,
     get_jwt
 )
 
+# Models
 from models import (
-    db,
-    User,
-    Developer,
-    Editor,
-    Game,
-    Genre,
-    GameGenre,
-    Review,
-    Role
+    db
 )
 
+# Schemas
 from schemas import(
     UserSchema,
     UserGameSchema,
@@ -33,11 +28,18 @@ from schemas import(
     RoleSchema
 )
 
+# Servicios
 from services.auth_service import AuthService
 from services.game_service import GameService
 from services.user_game_service import UserGameService
 from services.review_service import ReviewService
 from services.genre_service import GenreService
+from services.user_service import UserService
+from services.developer_service import DeveloperService
+from services.editor_service import EditorService
+from services.role_service import RoleService
+from services.stats_service import StatsService
+from services.game_genre_service import GameGenreService
 
 from functools import wraps
 
@@ -69,7 +71,7 @@ def roles_required(*allowed_roles: str):
 
 # ----- Autenticacion -----
 
-# API de registro (¡Refactorizada!)
+# API de registro 
 class UserRegisterAPI(MethodView):
     
     def __init__(self):
@@ -122,59 +124,79 @@ class AuthLoginAPI(MethodView):
         except ValueError as e:
             return {"message": str(e)}, 401
 
+
 # ----- Usuarios -----
 
 
-# API de usuarios
+# API de usuarios 
 class UserAPI(MethodView):
+    
+    def __init__(self):
+        self.service = UserService()
+
     # Traer usuarios activos (admin)
     @jwt_required()
     @roles_required('admin')
     def get(self):
-        users = User.query.filter_by(is_active=True).all()
+        # Llamar servicio para traer todos los usuarios activos
+        users = self.service.get_active_users()
         return UserSchema(many=True).dump(users), 200
 
 
-# API de detalle de usuario
+# API de detalle de usuario 
 class UserDetailAPI(MethodView):
     decorators = [jwt_required()]
+    
+    def __init__(self):
+        self.service = UserService()
+
     # Traer usuario (user, admin)
     @roles_required('admin','user')
     def get(self,id):
-        user = User.query.get_or_404(id)
-        return UserSchema().dump(user), 200
+        try:
+            # Llamar servicio para obtener usuario
+            user = self.service.get_user_by_id(id)
+            return UserSchema().dump(user), 200
+        # Manejar error
+        except ValueError as e:
+            return jsonify({"Error": str(e)}), 404
     
     # Modificar usuario (admin)
     @roles_required('admin')
     def patch(self,id):
-        # Traer usuario
-        user = User.query.get_or_404(id)
         try:
             # Validar datos
             data = UserSchema(partial=True).load(request.json)
-            # Actualizar campos
-            if 'username' in data:
-                user.username = data['username']
-            if 'email' in data:
-                user.email = data['email']
-            # Actualizar fecha de actualizacion y guardar   
-            user.updated_at = db.func.now()
-            db.session.commit()
         except ValidationError as err:
             return jsonify({"Error": err.messages}), 400
-        return UserSchema().dump(user), 200
+        
+        try:
+            # Llamar al servicio para actualizar usuario
+            updated_user = self.service.update_user(id, data)
+            return UserSchema().dump(updated_user), 200
+        # Manejar errores
+        except ValueError as e:
+            db.session.rollback()
+            return jsonify({"Error": str(e)}), 400 
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"Error": f"Error interno: {str(e)}"}), 500
     
     # Desactivar usuario (admin)
     @roles_required('admin')
     def delete(self,id):
-        # Traer usuario y desactivar
-        user = User.query.get_or_404(id)
-        user.is_active = False
-        db.session.commit()
-        return {"message": "Usuario desactivado"}, 200
+        try:
+            # Llamar al servicio para desactivar usuario
+            message = self.service.disable_user(id)
+            return jsonify(message), 200
+        # Manejar error "No encontrado"
+        except ValueError as e:
+            db.session.rollback()
+            return jsonify({"Error": str(e)}), 404
 
 
 # ------ Juegos -----
+
 
 # API de juegos 
 class GameAPI(MethodView):
@@ -265,7 +287,9 @@ class GameDetailAPI(MethodView):
             db.session.rollback()
             return jsonify({"Error": str(e)}), 404
 
+
 # ----- Biblioteca de juegos -----
+
 
 # API de biblioteca de juegos de usuario
 class UserGameAPI(MethodView):    
@@ -317,6 +341,25 @@ class UserGameAPI(MethodView):
         except Exception as e:
             db.session.rollback()
             return {'error': f'Error interno del servidor: {str(e)}'}, 500
+        
+
+# API de juegos por genero
+class GenreGamesAPI(MethodView):
+    decorators = [jwt_required(), roles_required('admin','moderator','user')]
+
+    def __init__(self):
+        self.service = GameGenreService()
+
+    # Traer juegos por genero
+    def get(self,id):
+        try:
+            # Llamar servicio para obtener los juegos segun id de genero
+            game_genres = self.service.get_games_for_genre(genre_id=id)
+            return GameGenreSchema(many=True).dump(game_genres), 200
+        # Manejar error de "No encontrado"
+        except ValueError as e:
+            return jsonify({"Error": str(e)}), 404
+
 
 # ----- Reviews -----
 
@@ -364,7 +407,7 @@ class ReviewAPI(MethodView):
             return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
 
-# API de detalle de review (¡Refactorizada!)
+# API de detalle de review 
 class ReviewDetailAPI(MethodView):
 
     def __init__(self):
@@ -407,7 +450,9 @@ class ReviewDetailAPI(MethodView):
         except ValueError as e:
             return jsonify({"Error": str(e)}), 404
 
+
 # ----- Generos -----
+
 
 # Api de generos 
 class GenreAPI(MethodView):
@@ -486,6 +531,8 @@ class GenreDetailAPI(MethodView):
             return jsonify({"Error": str(e)}), 404
 
 
+
+
 # ----- Developers y Editors -----
 
 
@@ -493,9 +540,13 @@ class GenreDetailAPI(MethodView):
 class DeveloperAPI(MethodView):
     @jwt_required()
     @roles_required('admin','moderator','user')
+    
+    def __init__(self):
+        self.service = DeveloperService()
+    
     # Traer developers
     def get(self):
-        developers = Developer.query.all()
+        developers = self.get_all_developers()
         return DeveloperSchema(many=True).dump(developers), 200
     
 
@@ -504,30 +555,49 @@ class DeveloperAPI(MethodView):
 class DeveloperDetailAPI(MethodView):
     @jwt_required()
     @roles_required('admin','moderator','user')
+
+    def __init__(self):
+        self.service = DeveloperService()
     # Traer developer por id
     def get(self,id):
-        developer = Developer.query.get_or_404(id)
-        return DeveloperSchema().dump(developer), 200
+        try:
+            # Llamar servicio para obtener developer
+            developer = self.get_developer_by_id(id)
+            return DeveloperSchema().dump(developer), 200
+        # Manejar error de "No encontrado"
+        except ValueError as e:
+            return jsonify({"Error": str(e)}), 404
 
 
 # API de editors
 class EditorAPI(MethodView):
-    @jwt_required()
-    @roles_required('admin','moderator','user')
-    # Traer editores
-    def get(self):
-        editors = Editor.query.all()
-        return EditorSchema(many=True).dump(editors), 200
+    decorators = [jwt_required(), roles_required('admin','moderator','user')]
 
+    def __init__(self):
+        self.service = EditorService()
+
+    # Traer todos los editores
+    def get(self):
+        # Llamar servicio para obtener editores
+        editors = self.service.get_all_editors()
+        return EditorSchema(many=True).dump(editors), 200
 
 # API de detalle de editor
 class EditorDetailAPI(MethodView):
-    @jwt_required()
-    @roles_required('admin','moderator','user')
+    decorators = [jwt_required(), roles_required('admin','moderator','user')]
+    
+    def __init__(self):
+        self.service = EditorService()
+
     # Traer editor por id
     def get(self,id):
-        editor = Editor.query.get_or_404(id)
-        return EditorSchema().dump(editor), 200
+        try:
+            # Llamar servicio para obtener editor
+            editor = self.service.get_editor_by_id(id)
+            return EditorSchema().dump(editor), 200
+        # Manejar error "No encontrado"
+        except ValueError as e:
+            return jsonify({"Error": str(e)}), 404
 
 
 # ------ Estadisticas -----
@@ -535,32 +605,28 @@ class EditorDetailAPI(MethodView):
 
 # API de estadisticas
 class StatsAPI(MethodView):
-    # Traer estadisticas (admin, moderator)
-    @jwt_required()
-    @roles_required('admin','moderator')
+    decorators = [jwt_required(), roles_required('admin','moderator')]
+    
+    def __init__(self):
+        self.service = StatsService()
+
+    # Obtener estadisticas     
     def get(self):
-        # Total de usuarios
-        total_users = User.query.count()
-        # Total de juegos
-        total_games = Game.query.count()
-        # Total de reviews
-        total_reviews = Review.query.count()
-        # Total de juegos subidos en la ultima semana
-        posts_last_week = Game.query.filter(
-            Game.uploaded_at >= db.func.now() - db.text('INTERVAL 7 DAY')
-        ).count()
-        return {
-            "total_users": total_users,
-            "total_games": total_games,
-            "total_reviews": total_reviews,
-            "posts_last_week": posts_last_week
-        }, 200
-            
+        # Llamar servicio
+        stats = self.service.get_dashboard_stats()
+        return jsonify(stats), 200
+
 
 # ----- Roles -----
 
+
 # API de roles
 class RoleAPI(MethodView):
+
+    def __init__(self):
+        self.service = RoleService()
+
+    # Traer todos los roles de usuario 
     def get(self):
-        roles = Role.query.all()
+        roles = self.get_all_roles()
         return RoleSchema(many=True).dump(roles), 200
